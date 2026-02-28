@@ -37,7 +37,7 @@ type ConfigObj = {
 };
 
 const DEFAULT_CONFIG: ConfigObj = {
-  project_name: "Ludonomia Asset Namer",
+  project_name: "Ludonomia",
   presets: {
     "Locomotion": {
       template: ["Category", "CharacterID", "SurfaceType", "Action"],
@@ -237,7 +237,7 @@ function App() {
   return (
     <div className="app-container">
       <header className="header">
-        <h1>Ludonomia Asset Namer</h1>
+        <h1>Ludonomia</h1>
         <p>Project: {config.project_name}</p>
       </header>
 

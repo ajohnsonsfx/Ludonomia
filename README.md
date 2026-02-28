@@ -1,4 +1,4 @@
-# Ludonomia Asset Namer
+# Ludonomia
 
 A premium, rule-based file naming tool designed for game development assets. 
 
