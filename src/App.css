@@ -80,13 +80,13 @@
   color: var(--text-primary);
 }
 
-.preset-selector {
+.name-set-selector {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.preset-selector select {
+.name-set-selector select {
   width: 100%;
   padding: 0.75rem 1rem;
   background-color: var(--bg-surface-hover);
@@ -101,7 +101,7 @@
   cursor: pointer;
 }
 
-.preset-selector select:focus {
+.name-set-selector select:focus {
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
