@@ -16,7 +16,7 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Plus } from 'lucide-react';
+import { GripVertical, Plus, Upload } from 'lucide-react';
 import './App.css';
 
 // --- Data Types & Default Config ---
@@ -183,6 +183,48 @@ function App() {
     })
   );
 
+  // Handle Load Project
+  const handleLoadProject = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const result = e.target?.result as string;
+        const loadedConfig = JSON.parse(result) as ConfigObj;
+
+        if (!loadedConfig.presets || !loadedConfig.categories) {
+          throw new Error("Invalid project format");
+        }
+
+        setConfig(loadedConfig);
+
+        const firstPreset = Object.keys(loadedConfig.presets)[0];
+        if (firstPreset) {
+          setActivePreset(firstPreset);
+          setTemplateOrder(loadedConfig.presets[firstPreset].template);
+        } else {
+          setActivePreset("");
+          setTemplateOrder([]);
+        }
+
+        const defaultSels: Record<string, string> = {};
+        Object.keys(loadedConfig.categories).forEach(cat => {
+          defaultSels[cat] = loadedConfig.categories[cat].terms[0] || "";
+        });
+        setSelections(defaultSels);
+
+      } catch (err) {
+        console.error("Failed to load project file", err);
+        alert("Failed to load project: Invalid JSON file format.");
+      }
+
+      event.target.value = '';
+    };
+    reader.readAsText(file);
+  };
+
   // Handle Preset Change
   const handlePresetChange = (presetName: string) => {
     setActivePreset(presetName);
@@ -240,7 +282,18 @@ function App() {
     <div className="app-container">
       <header className="header">
         <h1>Ludonomia</h1>
-        <p>Project: {config.project_name}</p>
+        <div className="project-info">
+          <p>Project: {config.project_name}</p>
+          <label className="load-project-btn" title="Load a .json project file">
+            <Upload size={16} /> Load Project...
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleLoadProject}
+              style={{ display: 'none' }}
+            />
+          </label>
+        </div>
       </header>
 
       <div className="workspace">
