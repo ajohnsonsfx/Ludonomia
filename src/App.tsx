@@ -106,10 +106,12 @@ function SortableCategoryItem({ id, category, terms, selectedValue, onChange, on
       ref={setNodeRef}
       style={style}
       className={`sortable-item ${isDragging ? 'dragging' : ''}`}
+      {...attributes}
+      {...listeners}
     >
       <div className="item-header">
         <span>{category}</span>
-        <div {...attributes} {...listeners} className="drag-handle">
+        <div className="drag-handle">
           <GripVertical size={18} />
         </div>
       </div>
