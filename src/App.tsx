@@ -16,7 +16,7 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Plus, Upload, PlusCircle, Filter, ChevronLeft, ChevronRight, Folder, Tag, X } from 'lucide-react';
+import { GripVertical, Plus, Upload, PlusCircle, Filter, ChevronLeft, ChevronRight, Folder, Tag, X, Copy, Download } from 'lucide-react';
 import './App.css';
 
 // --- Data Types & Default Config ---
@@ -111,53 +111,56 @@ function SortableElementItem({ id, element, terms, selectedValue, onChange, onAd
     <div
       ref={setNodeRef}
       style={style}
-      className={`sortable-item ${isDragging ? 'dragging' : ''}`}
+      className={`sortable-wrapper ${isDragging ? 'dragging' : ''}`}
       {...attributes}
       {...listeners}
     >
-      <div className="item-header">
-        <span>{element}</span>
-        <div className="drag-handle">
-          <GripVertical size={18} />
+      <div className="template-brace">{`{${element}}`}</div>
+      <div className="sortable-item">
+        <div className="item-header">
+          <span>{element}</span>
+          <div className="drag-handle">
+            <GripVertical size={18} />
+          </div>
         </div>
-      </div>
-      <select
-        className="term-select"
-        value={selectedValue}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="" disabled>Select {element}...</option>
-        {terms.map(t => (
-          <option key={t} value={t}>{t}</option>
-        ))}
-      </select>
-
-      <div className="add-term-container">
-        <input
-          type="text"
-          className="term-input"
-          placeholder="New term..."
-          value={newTerm}
-          onChange={e => setNewTerm(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && newTerm.trim()) {
-              onAddTerm(newTerm.trim());
-              setNewTerm("");
-            }
-          }}
-        />
-        <button
-          className="add-btn"
-          onClick={() => {
-            if (newTerm.trim()) {
-              onAddTerm(newTerm.trim());
-              setNewTerm("");
-            }
-          }}
-          title="Add Specific Term"
+        <select
+          className="term-select"
+          value={selectedValue}
+          onChange={(e) => onChange(e.target.value)}
         >
-          <Plus size={16} />
-        </button>
+          <option value="" disabled>Select {element}...</option>
+          {terms.map(t => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+
+        <div className="add-term-container">
+          <input
+            type="text"
+            className="term-input"
+            placeholder="New term..."
+            value={newTerm}
+            onChange={e => setNewTerm(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && newTerm.trim()) {
+                onAddTerm(newTerm.trim());
+                setNewTerm("");
+              }
+            }}
+          />
+          <button
+            className="add-btn"
+            onClick={() => {
+              if (newTerm.trim()) {
+                onAddTerm(newTerm.trim());
+                setNewTerm("");
+              }
+            }}
+            title="Add Specific Term"
+          >
+            <Plus size={16} />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -383,12 +386,31 @@ function App() {
     handleSelectionChange(element, term);
   };
 
-  // Compute final filename preview
-  const finalFilename = useMemo(() => {
-    return templateOrder
-      .map(wc => `{${wc}}`)
-      .join(' ');
-  }, [templateOrder]);
+  // Generate permutations for current template
+  const permutations = useMemo(() => {
+    if (templateOrder.length === 0) return [];
+
+    let perms: string[][] = [[]];
+    const MAX_SAFE_PERMUTATIONS = 10000;
+
+    for (const element of templateOrder) {
+      const terms = config.elements[element]?.terms || [];
+      const elementsToAdd = terms.length > 0 ? terms : [`{${element}}`];
+
+      const newPerms: string[][] = [];
+      for (const p of perms) {
+        for (const term of elementsToAdd) {
+          newPerms.push([...p, term]);
+          if (newPerms.length > MAX_SAFE_PERMUTATIONS) break;
+        }
+        if (newPerms.length > MAX_SAFE_PERMUTATIONS) break;
+      }
+      perms = newPerms;
+    }
+
+    const delimiter = config.nameSets[activeNameSet]?.delimiter || "_";
+    return perms.map(p => p.join(delimiter));
+  }, [templateOrder, config.elements, config.nameSets, activeNameSet]);
 
   return (
     <div className="app-container">
@@ -529,23 +551,35 @@ function App() {
                         </div>
                       )}
 
-                      <div className="item-list">
-                        {Object.keys(config.nameSets || {})
-                          .filter(ns => {
-                            const nsData = config.nameSets[ns];
-                            const matchesGroup = filterGroup === "All" || nsData.group === filterGroup;
-                            const matchesTag = !filterTag.trim() || (nsData.tags && nsData.tags.some(t => t.toLowerCase().includes(filterTag.toLowerCase())));
-                            return matchesGroup && matchesTag;
-                          })
-                          .map(ns => (
-                            <button
-                              key={ns}
-                              className={`list-item ${activeNameSet === ns ? 'active' : ''}`}
-                              onClick={() => handleNameSetChange(ns)}
-                            >
-                              {ns}
-                            </button>
-                          ))}
+                      <div className="item-list nameset-table">
+                        <div className="nameset-table-header">
+                          <span className="col-name">Name</span>
+                          <span className="col-group">Group</span>
+                          <span className="col-tags">Tags</span>
+                        </div>
+                        <div className="nameset-table-body">
+                          {Object.keys(config.nameSets || {})
+                            .filter(ns => {
+                              const nsData = config.nameSets[ns];
+                              const matchesGroup = filterGroup === "All" || nsData.group === filterGroup;
+                              const matchesTag = !filterTag.trim() || (nsData.tags && nsData.tags.some(t => t.toLowerCase().includes(filterTag.toLowerCase())));
+                              return matchesGroup && matchesTag;
+                            })
+                            .map(ns => {
+                              const nsData = config.nameSets[ns];
+                              return (
+                                <button
+                                  key={ns}
+                                  className={`list-item nameset-row ${activeNameSet === ns ? 'active' : ''}`}
+                                  onClick={() => handleNameSetChange(ns)}
+                                >
+                                  <span className="col-name">{ns}</span>
+                                  <span className="col-group">{nsData.group || ''}</span>
+                                  <span className="col-tags">{(nsData.tags || []).join(', ')}</span>
+                                </button>
+                              );
+                            })}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -619,12 +653,11 @@ function App() {
         </aside>
 
         <main className={`editor-main ${!isProjectBrowserOpen ? 'expanded' : ''}`}>
-          <div className="preview-bar">
-            <span>NameSet Template</span>
-            <div className="preview-text">{finalFilename}</div>
-          </div>
+          <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <div className="preview-bar-header" style={{ padding: '1.5rem 1.5rem 0 1.5rem' }}>
+              <span className="template-label">NameSet Template</span>
+            </div>
 
-          <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)' }}>
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -649,10 +682,55 @@ function App() {
                 </SortableContext>
               </div>
             </DndContext>
+
+            <div className="permutations-container">
+              <div className="permutations-header">
+                <span className="template-label">Generated Names ({permutations.length}{permutations.length >= 10000 ? '+' : ''})</span>
+                <div className="permutations-actions">
+                  <button
+                    className="action-btn"
+                    onClick={() => {
+                      navigator.clipboard.writeText(permutations.join('\n'));
+                      // Simple feedback
+                      const btn = document.activeElement as HTMLButtonElement;
+                      if (btn) {
+                        const originalText = btn.innerHTML;
+                        btn.innerHTML = '<span style="font-size: 0.75rem;">Copied!</span>';
+                        setTimeout(() => btn.innerHTML = originalText, 1500);
+                      }
+                    }}
+                    title="Copy to Clipboard"
+                  >
+                    <Copy size={14} /> Copy List
+                  </button>
+                  <button
+                    className="action-btn"
+                    onClick={() => {
+                      const csvContent = "data:text/csv;charset=utf-8," + permutations.join('\n');
+                      const encodedUri = encodeURI(csvContent);
+                      const link = document.createElement("a");
+                      link.setAttribute("href", encodedUri);
+                      link.setAttribute("download", `${activeNameSet}_names.csv`);
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                    title="Export as CSV"
+                  >
+                    <Download size={14} /> Export CSV
+                  </button>
+                </div>
+              </div>
+              <textarea
+                className="permutations-list-textarea"
+                readOnly
+                value={permutations.join('\n')}
+              />
+            </div>
           </div>
         </main>
       </div>
-    </div>
+    </div >
   );
 }
 
