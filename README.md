@@ -13,7 +13,7 @@ A premium, rule-based file naming tool designed for game development assets.
 To keep development clear, we use the following terms:
 - **Project**: This contains everything. It lives with the project.
 - **Name Set** (or *Asset Type*): Formerly called "Preset". This is a specific arrangement, like "Footsteps", "Attacks", etc.
-- **Wildcard**: Formerly called "Category". Things like Character ID, Surface Material, etc.
+- **Element**: Formerly called "Category". Things like Character ID, Surface Material, etc.
 
 ## Tech Stack
 - **Frontend**: React + TypeScript + dnd-kit

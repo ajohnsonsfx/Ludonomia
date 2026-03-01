@@ -16,12 +16,12 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Plus, Upload, PlusCircle, Filter } from 'lucide-react';
+import { GripVertical, Plus, Upload, PlusCircle, Filter, ChevronLeft, ChevronRight, Folder, Tag, X } from 'lucide-react';
 import './App.css';
 
 // --- Data Types & Default Config ---
 
-type WildcardDef = {
+type ElementDef = {
   terms: string[];
 };
 
@@ -35,27 +35,27 @@ type NameSetDef = {
 type ConfigObj = {
   project_name: string;
   nameSets: Record<string, NameSetDef>;
-  wildcards: Record<string, WildcardDef>;
+  elements: Record<string, ElementDef>;
 };
 
 const DEFAULT_CONFIG: ConfigObj = {
   project_name: "Ludonomia",
   nameSets: {
     "Locomotion": {
-      template: ["Wildcard", "CharacterID", "SurfaceType", "Action"],
+      template: ["Sound Type", "CharacterID", "SurfaceType", "Action"],
       delimiter: "_",
       group: "Movement",
       tags: ["Foley", "Core"]
     },
     "Weapons": {
-      template: ["Wildcard", "WeaponID", "FireMode", "Distance"],
+      template: ["Sound Type", "WeaponID", "FireMode", "Distance"],
       delimiter: "_",
       group: "Combat",
       tags: ["Guns", "Explosives"]
     }
   },
-  wildcards: {
-    "Wildcard": {
+  elements: {
+    "Sound Type": {
       terms: ["SFX", "VO", "MX", "AMB"]
     },
     "SurfaceType": {
@@ -81,16 +81,16 @@ const DEFAULT_CONFIG: ConfigObj = {
 
 // --- Sortable Item Component ---
 
-interface SortableWildcardProps {
+interface SortableElementProps {
   id: string;
-  wildcard: string;
+  element: string;
   terms: string[];
   selectedValue: string;
   onChange: (val: string) => void;
   onAddTerm: (term: string) => void;
 }
 
-function SortableWildcardItem({ id, wildcard, terms, selectedValue, onChange, onAddTerm }: SortableWildcardProps) {
+function SortableElementItem({ id, element, terms, selectedValue, onChange, onAddTerm }: SortableElementProps) {
   const [newTerm, setNewTerm] = useState("");
 
   const {
@@ -116,7 +116,7 @@ function SortableWildcardItem({ id, wildcard, terms, selectedValue, onChange, on
       {...listeners}
     >
       <div className="item-header">
-        <span>{wildcard}</span>
+        <span>{element}</span>
         <div className="drag-handle">
           <GripVertical size={18} />
         </div>
@@ -126,7 +126,7 @@ function SortableWildcardItem({ id, wildcard, terms, selectedValue, onChange, on
         value={selectedValue}
         onChange={(e) => onChange(e.target.value)}
       >
-        <option value="" disabled>Select {wildcard}...</option>
+        <option value="" disabled>Select {element}...</option>
         {terms.map(t => (
           <option key={t} value={t}>{t}</option>
         ))}
@@ -169,15 +169,15 @@ function App() {
   const [config, setConfig] = useState<ConfigObj>(DEFAULT_CONFIG);
   const [activeNameSet, setActiveNameSet] = useState<string>("Locomotion");
 
-  // The ordered wildcards for the current name set
+  // The ordered elements for the current name set
   const [templateOrder, setTemplateOrder] = useState<string[]>(config.nameSets["Locomotion"].template);
 
-  // State for user-selected terms for each wildcard
+  // State for user-selected terms for each element
   const [selections, setSelections] = useState<Record<string, string>>(() => {
     const defaultSels: Record<string, string> = {};
-    Object.keys(config.wildcards).forEach(wc => {
+    Object.keys(config.elements).forEach(wc => {
       // default select first term
-      defaultSels[wc] = config.wildcards[wc].terms[0];
+      defaultSels[wc] = config.elements[wc].terms[0];
     });
     return defaultSels;
   });
@@ -187,6 +187,14 @@ function App() {
   const [filterTag, setFilterTag] = useState<string>("");
   const [isCreatingNameSet, setIsCreatingNameSet] = useState<boolean>(false);
   const [newNameSetName, setNewNameSetName] = useState<string>("");
+
+  // UI state for Project Browser
+  const [isProjectBrowserOpen, setIsProjectBrowserOpen] = useState<boolean>(true);
+  const [projectBrowserTab, setProjectBrowserTab] = useState<'namesets' | 'elements'>('namesets');
+
+  // UI state for Elements
+  const [isCreatingElement, setIsCreatingElement] = useState<boolean>(false);
+  const [newElementName, setNewElementName] = useState<string>("");
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -211,12 +219,12 @@ function App() {
           parsedResult = parsedResult.replace(/"presets"/g, '"nameSets"');
         }
         if (result.includes('"categories"')) {
-          parsedResult = parsedResult.replace(/"categories"/g, '"wildcards"');
+          parsedResult = parsedResult.replace(/"categories"/g, '"elements"');
         }
 
         const loadedConfig = JSON.parse(parsedResult) as ConfigObj;
 
-        if (!loadedConfig.nameSets || !loadedConfig.wildcards) {
+        if (!loadedConfig.nameSets || !loadedConfig.elements) {
           throw new Error("Invalid project format");
         }
 
@@ -238,8 +246,8 @@ function App() {
         }
 
         const defaultSels: Record<string, string> = {};
-        Object.keys(loadedConfig.wildcards).forEach(wc => {
-          defaultSels[wc] = loadedConfig.wildcards[wc].terms[0] || "";
+        Object.keys(loadedConfig.elements).forEach(wc => {
+          defaultSels[wc] = loadedConfig.elements[wc].terms[0] || "";
         });
         setSelections(defaultSels);
 
@@ -272,8 +280,8 @@ function App() {
   };
 
   // Handle Selection Change
-  const handleSelectionChange = (wildcard: string, value: string) => {
-    setSelections(prev => ({ ...prev, [wildcard]: value }));
+  const handleSelectionChange = (element: string, value: string) => {
+    setSelections(prev => ({ ...prev, [element]: value }));
   };
 
   // Handle creating new nameset
@@ -305,6 +313,40 @@ function App() {
     setNewNameSetName("");
   };
 
+  const handleCreateElement = () => {
+    const trimmed = newElementName.trim();
+    if (!trimmed) return;
+    if (config.elements[trimmed]) {
+      alert("Element already exists!");
+      return;
+    }
+    setConfig(prev => ({
+      ...prev,
+      elements: {
+        ...prev.elements,
+        [trimmed]: { terms: [] }
+      }
+    }));
+    setIsCreatingElement(false);
+    setNewElementName("");
+  };
+
+  const handleRemoveElementTerm = (element: string, termToRemove: string) => {
+    setConfig(prev => {
+      const wc = prev.elements[element];
+      return {
+        ...prev,
+        elements: {
+          ...prev.elements,
+          [element]: {
+            ...wc,
+            terms: wc.terms.filter(t => t !== termToRemove)
+          }
+        }
+      };
+    });
+  };
+
   // Handle Update Active NameSet Metadata (Group/Tags)
   const handleUpdateNameSetMeta = (field: 'group' | 'tags', value: string | string[]) => {
     setConfig(prev => ({
@@ -320,15 +362,15 @@ function App() {
   };
 
   // Handle adding new term to config
-  const handleAddTerm = (wildcard: string, term: string) => {
+  const handleAddTerm = (element: string, term: string) => {
     setConfig(prev => {
-      const wc = prev.wildcards[wildcard];
+      const wc = prev.elements[element];
       if (!wc.terms.includes(term)) {
         return {
           ...prev,
-          wildcards: {
-            ...prev.wildcards,
-            [wildcard]: {
+          elements: {
+            ...prev.elements,
+            [element]: {
               ...wc,
               terms: [...wc.terms, term]
             }
@@ -338,7 +380,7 @@ function App() {
       return prev;
     });
     // Auto-select the newly added term
-    handleSelectionChange(wildcard, term);
+    handleSelectionChange(element, term);
   };
 
   // Compute final filename preview
@@ -350,12 +392,11 @@ function App() {
 
   return (
     <div className="app-container">
-      <header className="header">
-        <h1>Ludonomia</h1>
-        <div className="project-info">
-          <p>Project: {config.project_name}</p>
+      <header className="top-bar glass-panel">
+        <div className="top-bar-left">
+          <h1>Ludonomia</h1>
           <label className="load-project-btn" title="Load a .json project file">
-            <Upload size={16} /> Load Project...
+            <Upload size={16} /> Load Project
             <input
               type="file"
               accept=".json"
@@ -364,96 +405,37 @@ function App() {
             />
           </label>
         </div>
-      </header>
 
-      <div className="workspace">
-        <aside className="sidebar glass-panel">
-          <h2>Configuration</h2>
-
-          <div className="filter-section" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
-            <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Filter size={14} /> Filters</label>
-            <select
-              value={filterGroup}
-              onChange={(e) => setFilterGroup(e.target.value)}
-              className="term-select"
-              style={{ padding: '0.4rem', fontSize: '0.9rem' }}
-            >
-              <option value="All">All Groups</option>
-              {Array.from(new Set(Object.values(config.nameSets).map(ns => ns.group).filter(Boolean))).map(g => (
-                <option key={g as string} value={g as string}>{g as string}</option>
-              ))}
-            </select>
-            <input
-              type="text"
-              className="term-input"
-              placeholder="Filter by tag..."
-              value={filterTag}
-              onChange={e => setFilterTag(e.target.value)}
-              style={{ padding: '0.4rem', fontSize: '0.9rem' }}
-            />
-          </div>
-
-          <div className="name-set-selector">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label>Active Name Set</label>
-              <button
-                onClick={() => setIsCreatingNameSet(!isCreatingNameSet)}
-                style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0' }}
-                title="Create New NameSet"
+        <div className="top-bar-center">
+          <div className="nameset-config">
+            <label className="config-label">Active NameSet</label>
+            <div style={{ display: 'flex', gap: '0.25rem' }}>
+              <select
+                className="term-select active-nameset-select"
+                value={activeNameSet}
+                onChange={(e) => handleNameSetChange(e.target.value)}
               >
-                <PlusCircle size={16} />
-              </button>
-            </div>
-
-            {isCreatingNameSet && (
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
-                <input
-                  type="text"
-                  className="term-input"
-                  placeholder="New NameSet name..."
-                  value={newNameSetName}
-                  onChange={e => setNewNameSetName(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleCreateNameSet();
-                    if (e.key === 'Escape') setIsCreatingNameSet(false);
-                  }}
-                  autoFocus
-                />
-                <button className="add-btn" onClick={handleCreateNameSet}><Plus size={16} /></button>
-              </div>
-            )}
-
-            <select
-              value={activeNameSet}
-              onChange={(e) => handleNameSetChange(e.target.value)}
-            >
-              {Object.keys(config.nameSets || {})
-                .filter(ns => {
-                  const nsData = config.nameSets[ns];
-                  const matchesGroup = filterGroup === "All" || nsData.group === filterGroup;
-                  const matchesTag = !filterTag.trim() || (nsData.tags && nsData.tags.some(t => t.toLowerCase().includes(filterTag.toLowerCase())));
-                  return matchesGroup && matchesTag;
-                })
-                .map(ns => (
+                {Object.keys(config.nameSets || {}).map(ns => (
                   <option key={ns} value={ns}>{ns}</option>
                 ))}
-            </select>
+              </select>
+            </div>
           </div>
-
-          <div className="active-nameset-meta" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
-            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Group</label>
+          <div className="nameset-config">
+            <label className="config-label">Group</label>
             <input
               type="text"
-              className="term-input"
+              className="term-input config-input"
               value={config.nameSets[activeNameSet]?.group || ""}
               onChange={e => handleUpdateNameSetMeta('group', e.target.value)}
               placeholder="E.g. Combat"
             />
-
-            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Tags (comma separated)</label>
+          </div>
+          <div className="nameset-config">
+            <label className="config-label">Tags</label>
             <input
               type="text"
-              className="term-input"
+              className="term-input config-input"
               value={(config.nameSets[activeNameSet]?.tags || []).join(', ')}
               onChange={e => {
                 const tagsArray = e.target.value.split(',').map(t => t.trim()).filter(Boolean);
@@ -462,13 +444,181 @@ function App() {
               placeholder="E.g. ui, core"
             />
           </div>
+        </div>
 
-          <div style={{ marginTop: 'auto', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-            <p>Drag the handles on the right of each wildcard to reorder your naming convention.</p>
+        <div className="top-bar-right">
+          <div className="project-name">
+            {config.project_name}
           </div>
+        </div>
+      </header>
+
+      <div className="workspace">
+        <aside className={`project-browser glass-panel ${isProjectBrowserOpen ? 'open' : 'closed'}`}>
+          <div className="browser-header">
+            <h2>Project Browser</h2>
+            <button className="icon-btn" onClick={() => setIsProjectBrowserOpen(!isProjectBrowserOpen)}>
+              {isProjectBrowserOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+            </button>
+          </div>
+
+          {isProjectBrowserOpen && (
+            <>
+              <div className="browser-tabs">
+                <button
+                  className={`tab-btn ${projectBrowserTab === 'namesets' ? 'active' : ''}`}
+                  onClick={() => setProjectBrowserTab('namesets')}
+                >
+                  <Folder size={16} /> NameSets
+                </button>
+                <button
+                  className={`tab-btn ${projectBrowserTab === 'elements' ? 'active' : ''}`}
+                  onClick={() => setProjectBrowserTab('elements')}
+                >
+                  <Tag size={16} /> Elements
+                </button>
+              </div>
+
+              <div className="browser-content">
+                {projectBrowserTab === 'namesets' && (
+                  <div className="namesets-browser">
+                    <div className="filter-section browser-section">
+                      <label className="section-title"><Filter size={14} /> Filters</label>
+                      <select
+                        value={filterGroup}
+                        onChange={(e) => setFilterGroup(e.target.value)}
+                        className="term-select"
+                      >
+                        <option value="All">All Groups</option>
+                        {Array.from(new Set(Object.values(config.nameSets).map(ns => ns.group).filter(Boolean))).map(g => (
+                          <option key={g as string} value={g as string}>{g as string}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        className="term-input"
+                        placeholder="Filter by tag..."
+                        value={filterTag}
+                        onChange={e => setFilterTag(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="list-section browser-section">
+                      <div className="section-header">
+                        <label className="section-title">NameSets</label>
+                        <button className="icon-btn" onClick={() => setIsCreatingNameSet(!isCreatingNameSet)} title="Create New NameSet">
+                          <PlusCircle size={16} />
+                        </button>
+                      </div>
+
+                      {isCreatingNameSet && (
+                        <div className="create-inline">
+                          <input
+                            type="text"
+                            className="term-input"
+                            placeholder="New NameSet name..."
+                            value={newNameSetName}
+                            onChange={e => setNewNameSetName(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleCreateNameSet();
+                              if (e.key === 'Escape') setIsCreatingNameSet(false);
+                            }}
+                            autoFocus
+                          />
+                          <button className="add-btn" onClick={handleCreateNameSet}><Plus size={16} /></button>
+                        </div>
+                      )}
+
+                      <div className="item-list">
+                        {Object.keys(config.nameSets || {})
+                          .filter(ns => {
+                            const nsData = config.nameSets[ns];
+                            const matchesGroup = filterGroup === "All" || nsData.group === filterGroup;
+                            const matchesTag = !filterTag.trim() || (nsData.tags && nsData.tags.some(t => t.toLowerCase().includes(filterTag.toLowerCase())));
+                            return matchesGroup && matchesTag;
+                          })
+                          .map(ns => (
+                            <button
+                              key={ns}
+                              className={`list-item ${activeNameSet === ns ? 'active' : ''}`}
+                              onClick={() => handleNameSetChange(ns)}
+                            >
+                              {ns}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {projectBrowserTab === 'elements' && (
+                  <div className="elements-browser">
+                    <div className="list-section browser-section">
+                      <div className="section-header">
+                        <label className="section-title">All Elements</label>
+                        <button className="icon-btn" onClick={() => setIsCreatingElement(!isCreatingElement)} title="Create New Element">
+                          <PlusCircle size={16} />
+                        </button>
+                      </div>
+
+                      {isCreatingElement && (
+                        <div className="create-inline">
+                          <input
+                            type="text"
+                            className="term-input"
+                            placeholder="New Element name..."
+                            value={newElementName}
+                            onChange={e => setNewElementName(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleCreateElement();
+                              if (e.key === 'Escape') setIsCreatingElement(false);
+                            }}
+                            autoFocus
+                          />
+                          <button className="add-btn" onClick={handleCreateElement}><Plus size={16} /></button>
+                        </div>
+                      )}
+
+                      <div className="item-list full-height">
+                        {Object.keys(config.elements || {}).map(wc => (
+                          <div key={wc} className="element-card">
+                            <div className="element-card-header">{wc}</div>
+                            <div className="element-terms">
+                              {config.elements[wc].terms.map(term => (
+                                <span key={term} className="term-badge">
+                                  {term}
+                                  <button onClick={() => handleRemoveElementTerm(wc, term)}><X size={12} /></button>
+                                </span>
+                              ))}
+                            </div>
+                            <div className="add-term-container mini">
+                              <input
+                                type="text"
+                                className="term-input"
+                                placeholder="Add term..."
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    const val = e.currentTarget.value.trim();
+                                    if (val) {
+                                      handleAddTerm(wc, val);
+                                      e.currentTarget.value = '';
+                                    }
+                                  }
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </aside>
 
-        <main className="editor-main">
+        <main className={`editor-main ${!isProjectBrowserOpen ? 'expanded' : ''}`}>
           <div className="preview-bar">
             <span>NameSet Template</span>
             <div className="preview-text">{finalFilename}</div>
@@ -486,11 +636,11 @@ function App() {
                   strategy={horizontalListSortingStrategy}
                 >
                   {templateOrder.map((wcName) => (
-                    <SortableWildcardItem
+                    <SortableElementItem
                       key={wcName}
                       id={wcName}
-                      wildcard={wcName}
-                      terms={config.wildcards[wcName]?.terms || []}
+                      element={wcName}
+                      terms={config.elements[wcName]?.terms || []}
                       selectedValue={selections[wcName]}
                       onChange={(val) => handleSelectionChange(wcName, val)}
                       onAddTerm={(val) => handleAddTerm(wcName, val)}
